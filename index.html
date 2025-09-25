@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>AI Detection Games</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="style.css" rel="stylesheet" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <h1>AI Detection Games</h1>
+      <div id="score">Score: 0</div>
+    </header>
+
+    <main id="stage" class="card">
+      <div id="intro">
+        <h2>Welcome, challengers!</h2>
+        <p>Across 15 rounds, decide which content is AI vs human. No timers — discuss, debate, and lock in your answer.</p>
+        <button id="startBtn" class="btn accent">Start Game</button>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div id="progress"><div id="bar"></div></div>
+    </footer>
+  </div>
+  <footer class="signature">
+  Created with ❤️ by Johannes
+</footer>
+
+  <script src="questions.js"></script>
+<script id="images-manifest" type="application/json">
+{
+  "config": { "numImageRounds": 6, "choicesPerImageRound": 2 },
+  "ai": [
+    "assets/images/ai/carAI.png",
+    "assets/images/ai/catAI.png",
+    "assets/images/ai/flowerAI.png",
+    "assets/images/ai/glassesAI.png",
+    "assets/images/ai/StaplerAI.png",
+    "assets/images/ai/streetAI.png"
+  ],
+  "real": [
+    "assets/images/real/carREAL.png",
+    "assets/images/real/catREAL.png",
+    "assets/images/real/fruitREAL.png",
+    "assets/images/real/lizardREAL.png",
+    "assets/images/real/lotusREAL.png",
+    "assets/images/real/sculptureREAL.png"
+  ]
+}
+</script>
+
+  <script src="game.js"></script>
+</body>
+</html>
