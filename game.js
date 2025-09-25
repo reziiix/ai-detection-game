@@ -1,12 +1,13 @@
 // ===================== AI Detection Games - game.js =====================
-// Works with index.html, style.css, questions.js, and an <script type="application/json" id="images-manifest"> in index.html
-// If you open index.html via file://, EMBED the images JSON inside the page (not as a separate file).
+// Works with index.html, style.css, questions.js, and an embedded
+// <script type="application/json" id="images-manifest"> ... </script>
+// If you open index.html via file://, EMBED that JSON in the page (not a separate file).
 
 // ---------- tiny helpers ----------
 const $ = s => document.querySelector(s);
-const stage  = $("#stage");
+const stage   = $("#stage");
 const scoreEl = $("#score");
-const bar = $("#bar");
+const bar     = $("#bar");
 
 let score = 0;
 let current = 0;
@@ -25,10 +26,8 @@ function shuffled(arr){
 // ---------- image rounds from embedded JSON ----------
 async function buildImageRounds(){
   const node = document.getElementById("images-manifest");
-  if(!node){ return []; }
+  if(!node) return [];
 
-  // If the JSON is embedded in the tag, parse its textContent.
-  // (If you served images.json separately, you can fetch() it instead when using http:// or https://)
   let data;
   try { data = JSON.parse(node.textContent); }
   catch { return []; }
@@ -74,18 +73,18 @@ async function buildImageRounds(){
 
 // ---------- build the full quiz (text + optional image rounds) ----------
 async function buildQuiz(){
-  const textQs = (window.TEXT_QUESTIONS || []).slice(0, 15);
+  const textQs  = (window.TEXT_QUESTIONS || []).slice(0, 15);
   const imageQs = await buildImageRounds();
 
   const merged = [];
   let ti=0, ii=0;
 
-  // interleave: text, then image, etc. up to 15
+  // interleave: text then image, up to 15
   while(merged.length < 15 && (ti < textQs.length || ii < imageQs.length)){
     if(ti < textQs.length) merged.push({...textQs[ti++]});
     if(ii < imageQs.length && merged.length < 15) merged.push({...imageQs[ii++]});
   }
-  // pad with remaining text if needed
+  // pad with text if needed
   while(merged.length < 15 && ti < textQs.length) merged.push({...textQs[ti++]});
 
   // randomize answer order for non-image questions
@@ -101,7 +100,7 @@ async function buildQuiz(){
   return merged;
 }
 
-// ---------- UI helpers ----------
+// ---------- UI ----------
 function updateProgress(){
   const total = Math.max(1, allQuestions.length);
   bar.style.width = `${(current/total)*100}%`;
@@ -115,11 +114,15 @@ function renderIntro(){
       <p>Across 15 rounds, decide which content is AI vs human. No timers — discuss, debate, and lock in your answer.</p>
       <button id="startBtn" class="btn accent">Start Game</button>
     </div>`;
-  $("#startBtn").addEventListener("click", nextQuestion);
+  $("#startBtn").addEventListener("click", async () => {
+    score = 0; current = 0;
+    allQuestions = await buildQuiz();
+    renderQuestion(allQuestions[current]);
+  });
 }
 
 function renderQuestion(q){
-  const idx = current + 1; // show 1..15
+  const idx = current + 1; // 1..15
   updateProgress();
 
   if(q.type === "image"){
@@ -130,8 +133,10 @@ function renderQuestion(q){
       <div class="grid ${cols===3?'cols-3':'cols-2'}">
         ${q.options.map((url,i)=>`
           <div class="option" data-i="${i}">
-            <img src="${url}" alt="Option ${String.fromCharCode(65+i)}" />
-            <button class="btn pick btn choice">Pick ${String.fromCharCode(65+i)}</button>
+            <div class="imgbox">
+              <img src="${url}" alt="Option ${String.fromCharCode(65+i)}" />
+            </div>
+            <button class="btn pick">Pick ${String.fromCharCode(65+i)}</button>
           </div>
         `).join("")}
       </div>
@@ -166,7 +171,7 @@ function showFeedback(isCorrect){
 }
 
 // ---------- grading & navigation ----------
-// IMPORTANT: increment `current` ONLY here (fixes 16/15 bug)
+// Increment current ONLY here (fixes 16/15)
 function submit(i){
   const q = allQuestions[current];
   if(i === q.answer){
@@ -192,7 +197,7 @@ function renderEnd(){
         • AI can generate text that feels natural and images that look real.<br/>
         • Spotting AI is about subtle cues, consistency, and context — not just glitches.<br/>
         • In the future, critical thinking and verification will matter more than ever.<br/><br/>
-        👉 Replace this paragraph with your custom message for the booth.
+        👉 Replace this paragraph with your custom booth message.
       </p>
     </div>
 
@@ -225,8 +230,7 @@ async function nextQuestion(){
     renderEnd();
     return;
   }
-  // render current question (do NOT increment here)
-  renderQuestion(allQuestions[current]);
+  renderQuestion(allQuestions[current]);  // do NOT increment here
 }
 
 // ---------- boot ----------
