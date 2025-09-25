@@ -1,7 +1,8 @@
 // ===================== AI Detection Games - game.js =====================
-// Requires: index.html (with #stage, #score, #bar), style.css, questions.js,
+// Requires: index.html (with #stage, #score, #bar), style.css, questions.js
 // canvases: <canvas id="space-bg"></canvas> and <canvas id="confetti"></canvas>
-// If using file://, EMBED images JSON in: <script id="images-manifest" type="application/json">…</script>
+// Images manifest embedded in index.html:
+// <script id="images-manifest" type="application/json">{ "config": {...}, "ai":[...], "real":[...] }</script>
 
 // ---------- tiny helpers ----------
 const $  = s => document.querySelector(s);
@@ -15,10 +16,9 @@ let score = 0;
 let current = 0;
 let allQuestions = [];
 let streak = 0;
-let bonusAdded = false;
-let answered = false;   // NEW: lock per-question once answered
+let answered = false; // per-question answered lock
 
-// shuffle
+// shuffle utility
 function shuffled(arr){
   const a = [...arr];
   for(let i=a.length-1;i>0;i--){
@@ -28,7 +28,7 @@ function shuffled(arr){
   return a;
 }
 
-// ---------- Space Starfield ----------
+// ---------- Space Starfield (background) ----------
 (function initStarfield(){
   const canvas = document.getElementById("space-bg");
   if(!canvas) return;
@@ -53,8 +53,7 @@ function shuffled(arr){
   }
   function maybeShoot(){
     if(shooting || Math.random() > 0.006) return;
-    const fromTop = Math.random() < 0.6;
-    shooting = { x:Math.random()*w, y: fromTop?-20:Math.random()*h*0.4, vx:6+Math.random()*4, vy:2+Math.random()*2, life:0, maxLife:90+Math.random()*50 };
+    shooting = { x:Math.random()*w, y:-20, vx:6+Math.random()*4, vy:2+Math.random()*2, life:0, maxLife:120 };
   }
   function draw(){
     ctx.clearRect(0,0,w,h);
@@ -68,22 +67,16 @@ function shuffled(arr){
       ctx.beginPath();
       ctx.fillStyle = `rgba(231,233,255,${0.2+0.6*a})`;
       ctx.arc(st.x, st.y, st.r, 0, Math.PI*2); ctx.fill();
-      if(st.d > 0.7){
-        ctx.beginPath();
-        ctx.fillStyle = `rgba(108,140,255,${0.08*st.d})`;
-        ctx.arc(st.x, st.y, st.r*2.2, 0, Math.PI*2); ctx.fill();
-      }
     }
     if(shooting){
       shooting.life++;
       ctx.strokeStyle = `rgba(255,255,255,${1 - shooting.life/shooting.maxLife})`;
-      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(shooting.x, shooting.y);
       ctx.lineTo(shooting.x-24, shooting.y-10);
       ctx.stroke();
       shooting.x += shooting.vx; shooting.y += shooting.vy;
-      if(shooting.life > shooting.maxLife || shooting.x>w+60 || shooting.y>h+60) shooting = null;
+      if(shooting.life > shooting.maxLife) shooting = null;
     } else maybeShoot();
     requestAnimationFrame(draw);
   }
@@ -133,71 +126,71 @@ function shuffled(arr){
   };
 })();
 
-// ---------- glitch overlay ----------
-function glitchOverlay(){
-  let overlay = $("#glitch");
-  if(!overlay){
-    overlay = document.createElement("div");
-    overlay.id = "glitch";
-    document.body.appendChild(overlay);
-  }
-  overlay.classList.add("show");
-  setTimeout(()=>overlay.classList.remove("show"), 600);
-}
-
-// ---------- image rounds from embedded JSON ----------
-async function buildImageRounds(){
+// ---------- Build image rounds from embedded JSON ----------
+async function buildImageRounds(maxChoicesPer = 2){
   const node = document.getElementById("images-manifest");
   if(!node) return [];
   let data; try{ data = JSON.parse(node.textContent); } catch { return []; }
 
   const ai   = Array.isArray(data.ai)   ? [...data.ai]   : [];
   const real = Array.isArray(data.real) ? [...data.real] : [];
-  const numRounds = Math.max(0, (data.config && data.config.numImageRounds) || 6);
-  const choices   = Math.max(2, (data.config && data.config.choicesPerImageRound) || 2);
-
-  // NEW: difficulty label for image rounds (override via images-manifest config)
+  const choices = Math.max(2, (data.config && data.config.choicesPerImageRound) || maxChoicesPer);
   const imageDiff = (data.config && data.config.imageDifficulty) || "Medium";
 
-  if(ai.length===0 || real.length < (choices-1)) return [];
+  if(ai.length === 0 || real.length < (choices - 1)) return [];
 
-  const rounds=[];
-  for(let r=0;r<numRounds;r++){
-    if(ai.length===0 || real.length<(choices-1)) break;
+  const rounds = [];
+  // build as many as possible; we'll slice later to ensure at least 5 used
+  while(ai.length > 0 && real.length >= (choices-1)){
+    // pick 1 AI
     const aiPick = ai.splice((Math.random()*ai.length)|0,1)[0];
+    // pick (choices-1) real
     const realPicks=[];
     for(let k=0;k<choices-1;k++){
       if(real.length===0) break;
       realPicks.push(real.splice((Math.random()*real.length)|0,1)[0]);
     }
-    if(realPicks.length<(choices-1)) break;
+    if(realPicks.length < (choices-1)) break;
+
     const options = shuffled([{kind:"AI",url:aiPick}, ...realPicks.map(u=>({kind:"REAL",url:u}))]);
+    const answer = options.findIndex(o=>o.kind==="AI");
     rounds.push({
       type:"image",
       q:"Which image is AI-generated?",
       options: options.map(o=>o.url),
-      answer: options.findIndex(o=>o.kind==="AI"),
-      diff: imageDiff        // 👈 shows like Easy/Medium/Hard
+      answer,
+      diff: imageDiff
     });
   }
   return rounds;
 }
 
-// ---------- build the full quiz (+ optional bonus round) ----------
+// ---------- Build the quiz: 10 total, ≥5 images if available ----------
 async function buildQuiz(){
-  const textQs  = (window.TEXT_QUESTIONS || []).slice(0, 15);
-  const imageQs = await buildImageRounds();
-  const merged=[];
-  let ti=0, ii=0;
+  const desiredTotal = 10;
+  const desiredImages = 5;
 
-  while(merged.length<15 && (ti<textQs.length || ii<imageQs.length)){
-    if(ti<textQs.length) merged.push({...textQs[ti++]});
-    if(ii<imageQs.length && merged.length<15) merged.push({...imageQs[ii++]});
+  const imageQsAll = await buildImageRounds(2);
+  const imageCount = Math.min(desiredImages, imageQsAll.length);
+  const imageQs = imageQsAll.slice(0, imageCount);
+
+  const textNeeded = desiredTotal - imageQs.length;
+  const textQs = (window.TEXT_QUESTIONS || []).slice(0, textNeeded);
+
+  // Interleave for variety: start with text if we have any, otherwise image
+  const merged = [];
+  let ti = 0, ii = 0;
+  while(merged.length < desiredTotal && (ti < textQs.length || ii < imageQs.length)){
+    if(ti < textQs.length) merged.push({...textQs[ti++]});
+    if(ii < imageQs.length && merged.length < desiredTotal) merged.push({...imageQs[ii++]});
   }
-  while(merged.length<15 && ti<textQs.length) merged.push({...textQs[ti++]});
+  // If still short (e.g., not enough text or image), pad from whichever remains
+  while(merged.length < desiredTotal && ti < textQs.length) merged.push({...textQs[ti++]});
+  while(merged.length < desiredTotal && ii < imageQs.length) merged.push({...imageQs[ii++]});
 
+  // Randomize answer order for text questions only
   merged.forEach(q=>{
-    if(q.type!=="image"){
+    if(q.type !== "image"){
       const pairs = q.options.map((opt,i)=>({i,opt}));
       const shuf = shuffled(pairs);
       q.options = shuf.map(p=>p.opt);
@@ -205,24 +198,10 @@ async function buildQuiz(){
     }
   });
 
-  // Bonus round (2 pts) after the 15
-  if(!bonusAdded){
-    merged.push({
-      type:"text",
-      q:"✨ Bonus Round (worth 2 pts): Which statement is AI?",
-      options:[
-        "The night makes old cities feel like they remember you back.",
-        "Autonomy is an operational mode optimizing agentic throughput across goal hierarchies."
-      ],
-      answer:1,
-      diff:"Bonus"
-    });
-    bonusAdded = true;
-  }
   return merged;
 }
 
-// ---------- UI ----------
+// ---------- UI helpers ----------
 function updateProgress(){
   const total = Math.max(1, allQuestions.length);
   bar.style.width = `${(current/total)*100}%`;
@@ -245,11 +224,11 @@ function renderIntro(){
   stage.innerHTML = `
     <div id="intro">
       <h2>Welcome, challengers!</h2>
-      <p>Across 15 rounds + a bonus, decide which content is AI vs human. No timers — discuss, debate, and lock in your answer.</p>
+      <p>Across <strong>10 rounds</strong> (at least 5 image rounds), decide which content is AI vs human. No timers — discuss, debate, and lock in your answer.</p>
       <button id="startBtn" class="btn accent">Start Game</button>
     </div>`;
   $("#startBtn").addEventListener("click", async () => {
-    score=0; current=0; streak=0; bonusAdded=false; answered=false;
+    score=0; current=0; streak=0; answered=false;
     allQuestions = await buildQuiz();
     renderQuestion(allQuestions[current]);
   });
@@ -257,11 +236,8 @@ function renderIntro(){
 
 function renderQuestion(q){
   const idx = current + 1;
-  answered = false; // reset for this question
+  answered = false;
   updateProgress();
-
-  // occasional "AI interference"
-  if(current>0 && current%4===0) glitchOverlay();
 
   if(q.type === "image"){
     const cols = q.options.length;
@@ -272,7 +248,7 @@ function renderQuestion(q){
         ${q.options.map((url,i)=>`
           <div class="option floaty" data-i="${i}">
             <div class="imgbox">
-              <img src="${url}" alt="Option ${String.fromCharCode(65+i)}" />
+              <img src="${url}" alt="Option ${String.fromCharCode(65+i)}" loading="lazy"/>
             </div>
             <button class="btn pick">Pick ${String.fromCharCode(65+i)}</button>
           </div>
@@ -280,6 +256,7 @@ function renderQuestion(q){
       </div>
       <div class="streak" id="streak"></div>
       <div id="feedback"></div>
+      <div id="explain"></div>
       <div class="q-nav" style="display:flex;justify-content:space-between;margin-top:10px">
         <button id="skipBtn" class="btn ghost">Skip</button>
         <button id="nextBtn" class="btn accent" disabled>Next</button>
@@ -288,17 +265,18 @@ function renderQuestion(q){
     $$(".option").forEach(el=>{
       el.addEventListener("click", ()=>{
         if(answered) return;
-        el.classList.add("locked"); // pulse lock animation
+        el.classList.add("locked");
         submit(parseInt(el.dataset.i,10));
       });
     });
   } else {
     stage.innerHTML = `
       <div class="q-meta"><div>${(q.diff||'').toUpperCase()}</div><div>Question ${idx} / ${allQuestions.length}</div></div>
-      <div class="q-title glitch" data-text="${q.q}">${q.q}</div>
+      <div class="q-title">${q.q}</div>
       <div id="choices"></div>
       <div class="streak" id="streak"></div>
       <div id="feedback"></div>
+      <div id="explain"></div>
       <div class="q-nav" style="display:flex;justify-content:space-between;margin-top:10px">
         <button id="skipBtn" class="btn ghost">Skip</button>
         <button id="nextBtn" class="btn accent" disabled>Next</button>
@@ -321,12 +299,10 @@ function renderQuestion(q){
   // Nav handlers
   $("#skipBtn").addEventListener("click", ()=>{
     streak = 0;
-    // advance without scoring
     current++;
     nextQuestion();
   });
   $("#nextBtn").addEventListener("click", ()=>{
-    // Only proceeds after an answer (enabled then)
     nextQuestion();
   });
 
@@ -341,40 +317,36 @@ function updateStreakBadge(){
   else s.textContent = "";
 }
 
-function showFeedback(isCorrect, isBonus){
+function showFeedback(isCorrect){
   const fb = $("#feedback");
   fb.className = `feedback ${isCorrect===true?'ok':isCorrect===false?'bad':''}`;
-  fb.textContent = isCorrect===true ? (isBonus? "Double points! 🎯" : "Nice catch! 🎯") : "AI slipped past you. 🤖";
-
-  // NEW: enable Next button (no auto-advance)
+  fb.textContent = isCorrect===true ? "Nice catch! 🎯" : "AI slipped past you. 🤖";
   const nextBtn = $("#nextBtn");
   if(nextBtn) nextBtn.disabled = false;
 }
 
-// ---------- grading & navigation ----------
+// ---------- grading & highlighting ----------
 function submit(i){
   const q = allQuestions[current];
-  if(answered) return;        // prevent double submit
+  if(answered) return;
   answered = true;
 
-  const isBonus = (q.diff === "Bonus");
-  const pts = isBonus ? 2 : 1;
   const isCorrect = (i === q.answer);
 
-  // score + effects
+  // score & effects
   if(isCorrect){
-    score += pts;
+    score++;
     streak++;
     emojiPop("🎯");
     neonPulse();
-    showFeedback(true, isBonus);
+    showFeedback(true);
   } else {
     streak = 0;
     emojiPop("🤖");
-    showFeedback(false, isBonus);
+    showFeedback(false);
   }
 
-  // ---- VISUAL HIGHLIGHTING ----
+  // Visual highlighting
   if(q.type === "image"){
     const cards = document.querySelectorAll(".option");
     cards.forEach((el, idx) => {
@@ -384,7 +356,6 @@ function submit(i){
       if(idx === q.answer){
         el.classList.add("correct");
       }
-      // dim everything (and block clicks) now that we have an answer
       el.classList.add("disabled");
     });
   } else {
@@ -399,9 +370,8 @@ function submit(i){
       btn.classList.add("disabled");
     });
   }
-  // -----------------------------
 
-  // advance index immediately; screen stays until Next
+  // advance index; wait on this screen until Next
   current++;
   updateProgress();
   updateStreakBadge();
@@ -424,11 +394,10 @@ function renderEnd(){
     <div class="keybox">
       <h3>🤖 Key Takeaways</h3>
       <p>
-
-       • Human Oversight is Essential: Always critically review and validate AI outputs. Your expertise ensures accuracy and alignment with Novartis standards.<br/>
-       • Adhere to Novartis AI Principles: Use AI responsibly, especially when generating images or handling sensitive data, to maintain trust and compliance.<br/>
-       • Recognise & Address Bias: Be aware of AI's potential for bias in inputs and outputs, and actively work to mitigate it for fair and equitable outcomes.<br/>
-       • Unlock Business Value Responsibly: By applying these principles, we can harness AI's power effectively and ethically to drive innovation and impact at Novartis.<br/>
+        • <strong>Human Oversight is Essential:</strong> Always critically review and validate AI outputs. Your expertise ensures accuracy and alignment with Novartis standards.<br/>
+        • <strong>Adhere to Novartis AI Principles:</strong> Use AI responsibly, especially when generating images or handling sensitive data, to maintain trust and compliance.<br/>
+        • <strong>Recognise & Address Bias:</strong> Be aware of AI's potential for bias in inputs and outputs, and actively work to mitigate it for fair and equitable outcomes.<br/>
+        • <strong>Unlock Business Value Responsibly:</strong> By applying these principles, we can harness AI's power effectively and ethically to drive innovation and impact at Novartis.<br/>
       </p>
     </div>
 
@@ -445,12 +414,13 @@ function renderEnd(){
     </div>
   `;
   $("#again").addEventListener("click", async ()=>{
-    score=0; current=0; streak=0; bonusAdded=false; answered=false;
+    score=0; current=0; streak=0; answered=false;
     allQuestions = await buildQuiz();
     renderQuestion(allQuestions[current]);
   });
 }
 
+// ---------- leaderboard helpers ----------
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m])); }
 function saveScore(name, score, total){
   try{
@@ -476,16 +446,11 @@ function rankTitle(s,total){
 }
 
 async function nextQuestion(){
-  if(allQuestions.length === 0){
-    allQuestions = await buildQuiz();
-    current = 0; score = 0; streak = 0; answered=false;
-    updateProgress();
-  }
   if(current >= allQuestions.length){
     renderEnd();
     return;
   }
-  renderQuestion(allQuestions[current]);  // do NOT increment here
+  renderQuestion(allQuestions[current]);
 }
 
 // ---------- boot ----------
