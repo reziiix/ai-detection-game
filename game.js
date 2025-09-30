@@ -470,10 +470,14 @@ async function renderEnd(){
     <div class="keybox">
       <h3>🤖 Key Takeaways</h3>
       <p>
-        • AI can generate text that feels natural and images that look real.<br/>
-        • Spotting AI is about subtle cues, consistency, and context — not just glitches.<br/>
-        • In the future, critical thinking and verification will matter more than ever.<br/><br/>
-        👉 Replace this paragraph with your custom booth message.
+<strong> • Human Oversight is Essential:</strong> Always critically review and validate AI outputs. Your expertise ensures accuracy and alignment with Novartis standards.<br><br>
+
+<strong> • Adhere to Novartis AI Principles:</strong> Use AI responsibly, especially when generating images or handling sensitive data, to maintain trust and compliance.<br><br>
+
+<strong> • Recognise & Address Bias:</strong> Be aware of AI's potential for bias in inputs and outputs, and actively work to mitigate it for fair and equitable outcomes.<br><br>
+
+<strong> • Unlock Business Value Responsibly:</strong> By applying these principles, we can harness AI's power effectively and ethically to drive innovation and impact at Novartis.
+
       </p>
     </div>
 
