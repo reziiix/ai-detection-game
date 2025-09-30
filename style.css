@@ -194,3 +194,63 @@ p{color:var(--muted);margin:.2em 0 1em}
 
 /* Dim non-selected items a bit, and prevent more clicks */
 .option.disabled, .btn.choice.disabled { opacity: .6; pointer-events: none; }
+/* Leaderboard modal styles */
+#lb-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+#lb-modal.show {
+  display: flex;
+}
+
+.lb-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+}
+
+.lb-panel {
+  position: relative;
+  background: #1b1f2a;
+  color: #f5f5f5;
+  border-radius: 12px;
+  padding: 20px;
+  width: 90%;
+  max-width: 420px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  animation: popIn 0.3s ease;
+  z-index: 1001;
+}
+
+.lb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.lb-panel h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.lb-board {
+  padding-left: 20px;
+  margin: 0 0 12px 0;
+}
+
+.lb-board li {
+  margin: 4px 0;
+  display: flex;
+  justify-content: space-between;
+}
+
+@keyframes popIn {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

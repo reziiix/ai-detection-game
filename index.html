@@ -6,6 +6,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="style.css" rel="stylesheet" />
 </head>
+<!-- Leaderboard Modal -->
+<div id="lb-modal">
+  <div class="lb-backdrop"></div>
+  <div class="lb-panel">
+    <div class="lb-head">
+      <h3>Live Leaderboard</h3>
+      <button class="btn ghost" id="lb-close">Close</button>
+    </div>
+    <ol class="board lb-board"></ol>
+    <p class="small">Auto-refreshes every 5s</p>
+  </div>
+</div>
+
 <body>
     <canvas id="confetti"></canvas>
 
