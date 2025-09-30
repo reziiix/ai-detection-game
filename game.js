@@ -1,10 +1,8 @@
 // ===================== AI Detection Games - game.js =====================
-// Requires: index.html (with #stage, #score, #bar), style.css, questions.js
-// canvases: <canvas id="space-bg"></canvas> and <canvas id="confetti"></canvas>
-// Images manifest embedded in index.html:
-// <script id="images-manifest" type="application/json">{ "config": {...}, "ai":[...], "real":[...] }</script>
+// Frontend-only (GitHub Pages OK). Shared leaderboard via Supabase REST.
+// Canvases expected in HTML: <canvas id="space-bg"></canvas>, <canvas id="confetti"></canvas>
 
-// ---------- Shared leaderboard (Supabase REST) ----------
+// ---------- Supabase leaderboard (shared + live) ----------
 const SUPABASE_URL  = "https://tzmegilrifrlruljfamb.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6bWVnaWxyaWZybHJ1bGpmYW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2MzEsImV4cCI6MjA3NDc1MTYzMX0.UBpJTuPOg1DOwUvffd_ch0fKwWyYbmOPEpkzIEh3thg";
 const SCORES_TABLE  = "scores";
@@ -35,12 +33,9 @@ async function loadLeaderboardRemote(limit=10){
   try{
     const q = `${SUPABASE_URL}/rest/v1/${SCORES_TABLE}?select=name,score,total,ts&order=score.desc,ts.asc&limit=${limit}`;
     const r = await fetch(q, {
-      headers:{
-        "apikey": SUPABASE_ANON,
-        "Authorization": `Bearer ${SUPABASE_ANON}`
-      }
+      headers:{ "apikey": SUPABASE_ANON, "Authorization": `Bearer ${SUPABASE_ANON}` }
     });
-    return await r.json(); // [{name,score,total,ts}, ...]
+    return await r.json();
   }catch(e){
     console.warn("loadLeaderboardRemote failed", e);
     return [];
@@ -59,7 +54,7 @@ let score = 0;
 let current = 0;
 let allQuestions = [];
 let streak = 0;
-let answered = false; // per-question answered lock
+let answered = false;
 
 function shuffled(arr){
   const a = [...arr];
@@ -259,60 +254,56 @@ function emojiPop(char){
   setTimeout(()=>el.classList.remove("show"), 500);
 }
 
-// ---------- Global Leaderboard UI (button + modal) ----------
-function initLeaderboardUI(){
-  // Add button to topbar
-  const tb = document.querySelector(".topbar");
-  if(tb && !document.getElementById("lb-btn")){
-    const btn = document.createElement("button");
-    btn.id = "lb-btn";
-    btn.className = "btn ghost";
-    btn.textContent = "Leaderboard";
-    tb.appendChild(btn);
-    btn.addEventListener("click", openLeaderboardModal);
-  }
-
-  // Modal container (once)
-  if(!document.getElementById("lb-modal")){
-    const div = document.createElement("div");
-    div.id = "lb-modal";
-    div.innerHTML = `
-      <div class="lb-backdrop"></div>
-      <div class="lb-panel">
-        <div class="lb-head">
-          <h3>Live Leaderboard</h3>
-          <button class="btn ghost" id="lb-close">Close</button>
-        </div>
-        <ol class="board lb-board"></ol>
-        <p class="small">Auto-refreshes every 5s</p>
-      </div>
-    `;
-    document.body.appendChild(div);
-    div.querySelector("#lb-close").addEventListener("click", closeLeaderboardModal);
-    div.querySelector(".lb-backdrop").addEventListener("click", closeLeaderboardModal);
-  }
-}
+// ---------- Global Leaderboard UI (button + modal; creates if missing) ----------
 let lbPoll = null;
-async function openLeaderboardModal(){
-  const m = document.getElementById("lb-modal");
-  if(!m) return;
-  m.classList.add("show");
+function ensureLeaderboardModal(){
+  if(document.getElementById("lb-modal")) return;
+  const div = document.createElement("div");
+  div.id = "lb-modal";
+  div.innerHTML = `
+    <div class="lb-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.65)"></div>
+    <div class="lb-panel" style="position:relative;background:#1b1f2a;color:#f5f5f5;border-radius:12px;padding:20px;width:90%;max-width:420px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:1001">
+      <div class="lb-head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0;font-size:20px">Live Leaderboard</h3>
+        <button class="btn ghost" id="lb-close">Close</button>
+      </div>
+      <ol class="board lb-board" style="padding-left:20px;margin:0 0 12px 0"></ol>
+      <p class="small">Auto-refreshes every 5s</p>
+    </div>
+  `;
+  const wrap = document.createElement("div");
+  wrap.style.position = "fixed";
+  wrap.style.inset = "0";
+  wrap.style.display = "none";
+  wrap.style.alignItems = "center";
+  wrap.style.justifyContent = "center";
+  wrap.style.zIndex = "2000";
+  wrap.id = "lb-wrap";
+  wrap.appendChild(div);
+  document.body.appendChild(wrap);
+
+  div.querySelector("#lb-close").addEventListener("click", closeLeaderboardModal);
+  div.querySelector(".lb-backdrop").addEventListener("click", closeLeaderboardModal);
+}
+function openLeaderboardModal(){
+  ensureLeaderboardModal();
+  const wrap = document.getElementById("lb-wrap");
+  if(!wrap) return;
+  wrap.style.display = "flex";
 
   async function refresh(){
     const top = await loadLeaderboardRemote(10);
-    const ol = m.querySelector(".lb-board");
+    const ol = wrap.querySelector(".lb-board");
     if(!ol) return;
-    ol.innerHTML = top.map(x =>
-      `<li><span>${escapeHtml(x.name)}</span> <em>${x.score}/${x.total}</em></li>`
-    ).join("");
+    ol.innerHTML = top.map(x => `<li style="display:flex;justify-content:space-between;margin:4px 0">
+      <span>${escapeHtml(x.name)}</span><em>${x.score}/${x.total}</em></li>`).join("");
   }
-  await refresh();
+  refresh();
   lbPoll = setInterval(refresh, 5000);
 }
 function closeLeaderboardModal(){
-  const m = document.getElementById("lb-modal");
-  if(!m) return;
-  m.classList.remove("show");
+  const wrap = document.getElementById("lb-wrap");
+  if(wrap) wrap.style.display = "none";
   if(lbPoll){ clearInterval(lbPoll); lbPoll = null; }
 }
 
@@ -324,7 +315,7 @@ function renderIntro(){
       <p>Across <strong>10 rounds</strong> (at least 5 image rounds), decide which content is AI vs human. No timers — discuss, debate, and lock in your answer.</p>
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
         <button id="startBtn" class="btn accent">Start Game</button>
-        <button id="openLB" class="btn ghost">View Leaderboard</button>
+        <button id="openLB" class="btn ghost">Leaderboard</button>
       </div>
     </div>`;
   $("#startBtn").addEventListener("click", async () => {
@@ -359,8 +350,8 @@ function renderQuestion(q){
       <div id="feedback"></div>
       <div id="explain"></div>
       <div class="q-nav" style="display:flex;justify-content:space-between;margin-top:10px">
-        <button id="skipBtn" class="btn ghost">Skip</button>
-        <button id="nextBtn" class="btn accent" disabled>Next</button>
+        <button id="skipBtn" class="btn ghost" type="button">Skip</button>
+        <button id="nextBtn" class="btn accent" type="button" disabled>Next</button>
       </div>
     `;
     $$(".option").forEach(el=>{
@@ -379,8 +370,8 @@ function renderQuestion(q){
       <div id="feedback"></div>
       <div id="explain"></div>
       <div class="q-nav" style="display:flex;justify-content:space-between;margin-top:10px">
-        <button id="skipBtn" class="btn ghost">Skip</button>
-        <button id="nextBtn" class="btn accent" disabled>Next</button>
+        <button id="skipBtn" class="btn ghost" type="button">Skip</button>
+        <button id="nextBtn" class="btn accent" type="button" disabled>Next</button>
       </div>
     `;
     const box = $("#choices");
@@ -397,15 +388,12 @@ function renderQuestion(q){
     });
   }
 
-  // Nav handlers
   $("#skipBtn").addEventListener("click", ()=>{
     streak = 0;
     current++;
     nextQuestion();
   });
-  $("#nextBtn").addEventListener("click", ()=>{
-    nextQuestion();
-  });
+  $("#nextBtn").addEventListener("click", ()=> nextQuestion());
 
   updateStreakBadge();
 }
@@ -422,8 +410,7 @@ function showFeedback(isCorrect){
   const fb = $("#feedback");
   fb.className = `feedback ${isCorrect===true?'ok':isCorrect===false?'bad':''}`;
   fb.textContent = isCorrect===true ? "Nice catch! 🎯" : "AI slipped past you. 🤖";
-  const nextBtn = $("#nextBtn");
-  if(nextBtn) nextBtn.disabled = false;
+  $("#nextBtn")?.removeAttribute("disabled");
 }
 
 // ---------- grading & highlighting ----------
@@ -434,7 +421,6 @@ function submit(i){
 
   const isCorrect = (i === q.answer);
 
-  // score & effects
   if(isCorrect){
     score++;
     streak++;
@@ -447,33 +433,23 @@ function submit(i){
     showFeedback(false);
   }
 
-  // Visual highlighting (keep chosen visible + correct outline)
   if(q.type === "image"){
     const cards = document.querySelectorAll(".option");
     cards.forEach((el, idx) => {
-      if(idx === i){
-        el.classList.add(isCorrect ? "selected-correct" : "selected-wrong");
-      }
-      if(idx === q.answer){
-        el.classList.add("correct");
-      }
+      if(idx === i) el.classList.add(isCorrect ? "selected-correct" : "selected-wrong");
+      if(idx === q.answer) el.classList.add("correct");
       el.classList.add("disabled");
     });
   } else {
     const btns = document.querySelectorAll(".btn.choice");
     btns.forEach((btn, idx) => {
-      if(idx === i){
-        btn.classList.add(isCorrect ? "selected-correct" : "selected-wrong");
-      }
-      if(idx === q.answer){
-        btn.classList.add("correct");
-      }
+      if(idx === i) btn.classList.add(isCorrect ? "selected-correct" : "selected-wrong");
+      if(idx === q.answer) btn.classList.add("correct");
       btn.classList.add("disabled");
     });
   }
 
-  // advance index; wait on this screen until Next
-  current++;
+  current++; // advance but wait on screen until Next
   updateProgress();
   updateStreakBadge();
 }
@@ -482,9 +458,7 @@ async function renderEnd(){
   launchConfetti(2800);
   updateProgress();
 
-  const name = prompt("Great job! Enter your name or initials for the leaderboard:", "Player");
-  await saveScoreRemote(name || "Player", score, allQuestions.length);
-
+  // Build screen first so UI always works
   stage.innerHTML = `
     <h2>Game Over!</h2>
     <p><strong>You scored ${score} / ${allQuestions.length}</strong></p>
@@ -507,55 +481,56 @@ async function renderEnd(){
     </div>
 
     <div style="margin-top:18px">
-      <button id="again" class="btn accent">Play Again</button>
+      <button id="again" class="btn accent" type="button">Play Again</button>
+      <button id="viewLB" class="btn ghost" type="button">Open Full Leaderboard</button>
     </div>
   `;
 
-  // Live leaderboard refresh (Top 5 on end screen)
+  // Buttons always active
   let pollId = null;
-  async function refreshBoard(){
-    const top = (await loadLeaderboardRemote(10)).slice(0,5);
-    const ol = stage.querySelector("ol.board");
-    if(!ol) return;
-    ol.innerHTML = top.map(x =>
-      `<li><span>${escapeHtml(x.name)}</span> <em>${x.score}/${x.total}</em></li>`
-    ).join("");
-  }
-  await refreshBoard();
-  pollId = setInterval(refreshBoard, 5000);
-
-  // Clear poll when restarting
-  $("#again").addEventListener("click", async ()=>{
+  $("#again")?.addEventListener("click", async ()=>{
     if(pollId) clearInterval(pollId);
     score=0; current=0; streak=0; answered=false;
     allQuestions = await buildQuiz();
     renderQuestion(allQuestions[current]);
   });
+  $("#viewLB")?.addEventListener("click", openLeaderboardModal);
+
+  // Save score (non-blocking) → then refresh board and start polling
+  try{
+    const name = prompt("Great job! Enter your name or initials for the leaderboard:", "Player");
+    await saveScoreRemote(name || "Player", score, allQuestions.length);
+  }catch(e){ console.warn("saveScoreRemote error", e); }
+
+  async function refreshBoard(){
+    try{
+      const top = (await loadLeaderboardRemote(10)).slice(0,5);
+      const ol = stage.querySelector("ol.board");
+      if(!ol) return;
+      ol.innerHTML = top.map(x =>
+        `<li><span>${escapeHtml(x.name)}</span> <em>${x.score}/${x.total}</em></li>`
+      ).join("");
+    }catch(e){ console.warn("refreshBoard failed", e); }
+  }
+  await refreshBoard();
+  pollId = setInterval(refreshBoard, 5000);
 }
 
 // ---------- helpers ----------
 function rankTitle(s,total){
-  if(s <= total*0.33) return "AI Victim — the bots got you this time.";
-  if(s <= total*0.66) return "AI Sleuth — solid instincts.";
-  if(s < total)       return "Matrix Breaker — you see through the static.";
+  if(s <= total*0.33) return "AI Sleuth — solid instincts.";
+  if(s <= total*0.66) return "Matrix Breaker — sharp eyes.";
+  if(s < total)       return "Reality Bender — almost perfect.";
   return "Unstoppable Human Mind — perfection!";
 }
-
 async function nextQuestion(){
-  if(current >= allQuestions.length){
-    renderEnd();
-    return;
-  }
+  if(current >= allQuestions.length){ renderEnd(); return; }
   renderQuestion(allQuestions[current]);
 }
 
 // ---------- boot ----------
-document.addEventListener("DOMContentLoaded", () => {
-  renderIntro();
-
-  // Hook leaderboard button + modal
+document.addEventListener("DOMContentLoaded", ()=>{
+  // If you placed a Leaderboard button in the topbar yourself:
   $("#lb-btn")?.addEventListener("click", openLeaderboardModal);
-  $("#lb-close")?.addEventListener("click", closeLeaderboardModal);
-  $("#lb-modal .lb-backdrop")?.addEventListener("click", closeLeaderboardModal);
+  renderIntro();
 });
-

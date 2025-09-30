@@ -201,9 +201,9 @@ p{color:var(--muted);margin:.2em 0 1em}
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 2000;
 }
-
+.app, .topbar, #stage, #lb-modal { position: relative; z-index: 2; }
 #lb-modal.show {
   display: flex;
 }
