@@ -4,22 +4,23 @@
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 "Segoe UI",system-ui,-apple-system,Arial}
-#app{max-width:1100px;margin:0 auto;padding:16px;position:relative;z-index:1}
+#app{max-width:1100px;margin:0 auto;padding:16px;position:relative;z-index:10} /* ↑ keep app above canvases */
 
-/* Background canvases */
+/* Background canvases (never intercept clicks) */
 #space-bg{
   position: fixed; inset: 0; z-index: 0;
   background: radial-gradient(ellipse at 50% 120%, #0a0d20 0%, #07091a 50%, #050716 100%);
   pointer-events: none;
 }
 #confetti{
-  position: fixed; inset: 0; z-index: 2; pointer-events: none;
+  position: fixed; inset: 0; z-index: 1; pointer-events: none; /* lowered below UI */
 }
 
 .topbar{
   display:flex;justify-content:space-between;align-items:center;
   padding:14px 18px;background:var(--panel);border-radius:12px;
   box-shadow:0 10px 30px rgba(0,0,0,.35), 0 0 24px rgba(108,140,255,.08);
+  position:relative; z-index:11; /* ↑ above canvases and card aurora */
 }
 .topbar.pulse{ animation: neon 0.4s ease; }
 @keyframes neon{
@@ -34,7 +35,7 @@ body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 "Segoe UI",s
   margin-top:16px;padding:32px;background:var(--panel);
   border-radius:20px;box-shadow:var(--shadow);
   min-height:70vh;display:flex;flex-direction:column;justify-content:flex-start;
-  position:relative;overflow:hidden;
+  position:relative;overflow:hidden; z-index:10; /* keep above canvases */
 }
 /* Aurora glow behind the card */
 .card::before{
@@ -49,10 +50,12 @@ body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 "Segoe UI",s
 h2{margin:.2em 0 .6em}
 p{color:var(--muted);margin:.2em 0 1em}
 
+/* Buttons (always clickable and above nearby effects) */
 .btn{
   appearance:none;border:0;border-radius:12px;padding:12px 16px;
   font-weight:700;cursor:pointer;color:var(--text);background:#20264d;
-  transition:.2s;box-shadow:0 4px 16px rgba(0,0,0,.25)
+  transition:.2s;box-shadow:0 4px 16px rgba(0,0,0,.25);
+  position:relative; z-index:12; pointer-events:auto;
 }
 .btn:hover{background:#2a3170}
 .btn.accent{background:var(--accent)}
@@ -96,6 +99,7 @@ p{color:var(--muted);margin:.2em 0 1em}
 .option{
   background:#1b2044;border:1px solid #26305f;border-radius:16px;
   padding:18px;display:flex;flex-direction:column;box-shadow:var(--shadow);
+  position:relative; z-index:10;
 }
 .option.locked{ animation: lockPulse .35s ease; }
 
@@ -152,7 +156,7 @@ p{color:var(--muted);margin:.2em 0 1em}
 /* Emoji pop */
 #emoji-pop{
   position: fixed; left: 50%; top: 25%; transform: translate(-50%,-50%) scale(.9);
-  font-size: 64px; z-index: 3; opacity: 0; transition: transform .15s, opacity .15s; pointer-events:none;
+  font-size: 64px; z-index: 20; opacity: 0; transition: transform .15s, opacity .15s; pointer-events:none;
 }
 #emoji-pop.show{ opacity:1; transform: translate(-50%,-50%) scale(1.05) }
 
@@ -180,8 +184,8 @@ p{color:var(--muted);margin:.2em 0 1em}
   .grid.cols-2,.grid.cols-3{grid-template-columns:1fr}
   .imgbox{min-height:240px}
 }
-/* ===== Highlighting after answer ===== */
 
+/* ===== Highlighting after answer ===== */
 /* For image options */
 .option.selected-correct { border-color: var(--accent2); box-shadow: 0 0 18px rgba(35,208,168,.35); }
 .option.selected-wrong   { border-color: var(--danger);  box-shadow: 0 0 18px rgba(255,107,107,.35); }
@@ -194,19 +198,17 @@ p{color:var(--muted);margin:.2em 0 1em}
 
 /* Dim non-selected items a bit, and prevent more clicks */
 .option.disabled, .btn.choice.disabled { opacity: .6; pointer-events: none; }
-/* Leaderboard modal styles */
+
+/* ===== Leaderboard modal ===== */
 #lb-modal {
   position: fixed;
   inset: 0;
   display: none;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: 2000; /* on top of everything */
 }
-.app, .topbar, #stage, #lb-modal { position: relative; z-index: 2; }
-#lb-modal.show {
-  display: flex;
-}
+#lb-modal.show { display: flex; }
 
 .lb-backdrop {
   position: absolute;

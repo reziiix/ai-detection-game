@@ -255,57 +255,60 @@ function emojiPop(char){
 }
 
 // ---------- Global Leaderboard UI (button + modal; creates if missing) ----------
-let lbPoll = null;
-function ensureLeaderboardModal(){
-  if(document.getElementById("lb-modal")) return;
+// Ensure the modal HTML exists (if you didn't include it in index.html)
+function ensureLeaderboardModal() {
+  if (document.getElementById("lb-modal")) return;
   const div = document.createElement("div");
   div.id = "lb-modal";
   div.innerHTML = `
-    <div class="lb-backdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.65)"></div>
-    <div class="lb-panel" style="position:relative;background:#1b1f2a;color:#f5f5f5;border-radius:12px;padding:20px;width:90%;max-width:420px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:1001">
-      <div class="lb-head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h3 style="margin:0;font-size:20px">Live Leaderboard</h3>
-        <button class="btn ghost" id="lb-close">Close</button>
+    <div class="lb-backdrop"></div>
+    <div class="lb-panel">
+      <div class="lb-head">
+        <h3>Live Leaderboard</h3>
+        <button class="btn ghost lb-close">Close</button>
       </div>
-      <ol class="board lb-board" style="padding-left:20px;margin:0 0 12px 0"></ol>
+      <ol class="board lb-board"></ol>
       <p class="small">Auto-refreshes every 5s</p>
     </div>
   `;
-  const wrap = document.createElement("div");
-  wrap.style.position = "fixed";
-  wrap.style.inset = "0";
-  wrap.style.display = "none";
-  wrap.style.alignItems = "center";
-  wrap.style.justifyContent = "center";
-  wrap.style.zIndex = "2000";
-  wrap.id = "lb-wrap";
-  wrap.appendChild(div);
-  document.body.appendChild(wrap);
+  document.body.appendChild(div);
 
-  div.querySelector("#lb-close").addEventListener("click", closeLeaderboardModal);
+  // Attach close handlers
   div.querySelector(".lb-backdrop").addEventListener("click", closeLeaderboardModal);
+  div.querySelector(".lb-close").addEventListener("click", closeLeaderboardModal);
 }
-function openLeaderboardModal(){
-  ensureLeaderboardModal();
-  const wrap = document.getElementById("lb-wrap");
-  if(!wrap) return;
-  wrap.style.display = "flex";
 
-  async function refresh(){
+
+let lbPoll = null;
+
+function openLeaderboardModal() {
+  ensureLeaderboardModal();
+  const m = document.getElementById("lb-modal");
+  if (!m) return;
+  m.classList.add("show"); // <- THIS makes it visible (matches your CSS)
+
+  async function refresh() {
     const top = await loadLeaderboardRemote(10);
-    const ol = wrap.querySelector(".lb-board");
-    if(!ol) return;
-    ol.innerHTML = top.map(x => `<li style="display:flex;justify-content:space-between;margin:4px 0">
-      <span>${escapeHtml(x.name)}</span><em>${x.score}/${x.total}</em></li>`).join("");
+    const ol = m.querySelector(".lb-board");
+    if (!ol) return;
+    ol.innerHTML = top.map(x =>
+      `<li style="display:flex;justify-content:space-between;margin:4px 0">
+         <span>${escapeHtml(x.name)}</span><em>${x.score}/${x.total}</em>
+       </li>`
+    ).join("");
   }
   refresh();
+  if (lbPoll) clearInterval(lbPoll);
   lbPoll = setInterval(refresh, 5000);
 }
-function closeLeaderboardModal(){
-  const wrap = document.getElementById("lb-wrap");
-  if(wrap) wrap.style.display = "none";
-  if(lbPoll){ clearInterval(lbPoll); lbPoll = null; }
+
+function closeLeaderboardModal() {
+  const m = document.getElementById("lb-modal");
+  if (!m) return;
+  m.classList.remove("show");
+  if (lbPoll) { clearInterval(lbPoll); lbPoll = null; }
 }
+
 
 // ---------- Screens ----------
 function renderIntro(){
@@ -527,6 +530,35 @@ async function nextQuestion(){
   if(current >= allQuestions.length){ renderEnd(); return; }
   renderQuestion(allQuestions[current]);
 }
+// --- Guaranteed click handler for all Leaderboard buttons anywhere ---
+// --- Guaranteed click handler for all Leaderboard buttons ---
+document.addEventListener("click", (e) => {
+  const t = e.target && e.target.closest && e.target.closest("#openLB, #lb-btn, #viewLB");
+  if (!t) return;
+  e.preventDefault();
+  e.stopPropagation();
+  // Optional debug:
+  // console.log("Leaderboard button clicked:", t.id || t.textContent);
+  try { openLeaderboardModal(); } catch (err) { console.warn("openLeaderboardModal failed:", err); }
+});
+
+
+// --- Global handlers to ALWAYS close the leaderboard ---
+document.addEventListener("click", (e) => {
+  // Close on "Close" button or backdrop click
+  const shouldClose = e.target?.closest?.("#lb-close, .lb-close, #lb-modal .lb-backdrop");
+  if (!shouldClose) return;
+  e.preventDefault();
+  e.stopPropagation();
+  try { closeLeaderboardModal(); } catch (err) { console.warn("closeLeaderboardModal failed:", err); }
+});
+
+// Esc key closes the modal too
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    try { closeLeaderboardModal(); } catch {}
+  }
+});
 
 // ---------- boot ----------
 document.addEventListener("DOMContentLoaded", ()=>{
