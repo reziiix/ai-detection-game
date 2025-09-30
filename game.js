@@ -5,6 +5,56 @@
 // <script id="images-manifest" type="application/json">{ "config": {...}, "ai":[...], "real":[...] }</script>
 
 // ---------- tiny helpers ----------
+
+
+// ---- Shared leaderboard (Supabase REST) ----
+const SUPABASE_URL  = "https://tzmegilrifrlruljfamb.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR6bWVnaWxyaWZybHJ1bGpmYW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNzU2MzEsImV4cCI6MjA3NDc1MTYzMX0.UBpJTuPOg1DOwUvffd_ch0fKwWyYbmOPEpkzIEh3thg";
+const SCORES_TABLE  = "scores";
+
+async function saveScore(name, score, total){
+  const row = {
+    name: String(name || "Player").slice(0, 20),
+    score: Math.max(0, Math.min(Number(score||0), Number(total||10))),
+    total: Number(total||10),
+    ts: Date.now()
+  };
+  try{
+    await fetch(`${SUPABASE_URL}/rest/v1/${SCORES_TABLE}`, {
+      method:"POST",
+      headers:{
+        "apikey": SUPABASE_ANON,
+        "Authorization": `Bearer ${SUPABASE_ANON}`,
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+      },
+      body: JSON.stringify(row)
+    });
+  }catch(e){
+    console.warn("saveScore failed", e);
+  }
+}
+
+async function loadLeaderboard(){
+  try{
+    const q = `${SUPABASE_URL}/rest/v1/${SCORES_TABLE}?select=name,score,total,ts&order=score.desc,ts.asc&limit=10`;
+    const r = await fetch(q, {
+      headers:{
+        "apikey": SUPABASE_ANON,
+        "Authorization": `Bearer ${SUPABASE_ANON}`
+      }
+    });
+    return await r.json(); // [{name, score, total, ts}, ...]
+  }catch(e){
+    console.warn("loadLeaderboard failed", e);
+    return [];
+  }
+}
+
+
+
+
+
 const $  = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
 const stage   = $("#stage");
@@ -377,14 +427,12 @@ function submit(i){
   updateStreakBadge();
 }
 
-function renderEnd(){
+async function renderEnd(){
   launchConfetti(2800);
   updateProgress();
 
   const name = prompt("Great job! Enter your name or initials for the leaderboard:", "Player");
-  saveScore(name || "Player", score, allQuestions.length);
-
-  const top = loadLeaderboard();
+  await saveScore(name || "Player", score, allQuestions.length);
 
   stage.innerHTML = `
     <h2>Game Over!</h2>
@@ -394,31 +442,46 @@ function renderEnd(){
     <div class="keybox">
       <h3>🤖 Key Takeaways</h3>
       <p>
-        • <strong>Human Oversight is Essential:</strong> Always critically review and validate AI outputs. Your expertise ensures accuracy and alignment with Novartis standards.<br/>
-        • <strong>Adhere to Novartis AI Principles:</strong> Use AI responsibly, especially when generating images or handling sensitive data, to maintain trust and compliance.<br/>
-        • <strong>Recognise & Address Bias:</strong> Be aware of AI's potential for bias in inputs and outputs, and actively work to mitigate it for fair and equitable outcomes.<br/>
-        • <strong>Unlock Business Value Responsibly:</strong> By applying these principles, we can harness AI's power effectively and ethically to drive innovation and impact at Novartis.<br/>
+        • AI can generate text that feels natural and images that look real.<br/>
+        • Spotting AI is about subtle cues, consistency, and context — not just glitches.<br/>
+        • In the future, critical thinking and verification will matter more than ever.<br/><br/>
+        👉 Replace this paragraph with your custom booth message.
       </p>
     </div>
 
     <div class="keybox" style="margin-top:18px">
       <h3>🏆 Leaderboard (Top 5)</h3>
-      <ol class="board">
-        ${top.map(x=>`<li><span>${escapeHtml(x.name)}</span> <em>${x.score}/${x.total}</em></li>`).join("")}
-      </ol>
-      <p class="small">Scores are stored locally in this browser.</p>
+      <ol class="board"></ol>
+      <p class="small">Live scores from all players</p>
     </div>
 
     <div style="margin-top:18px">
       <button id="again" class="btn accent">Play Again</button>
     </div>
   `;
+
+  // ---- Live leaderboard refresh ----
+  let pollId = null;
+  async function refreshBoard(){
+    const top = await loadLeaderboard();
+    const ol = stage.querySelector("ol.board");
+    if(!ol) return;
+    ol.innerHTML = top.map(x =>
+      `<li><span>${escapeHtml(x.name)}</span> <em>${x.score}/${x.total}</em></li>`
+    ).join("");
+  }
+  await refreshBoard();
+  pollId = setInterval(refreshBoard, 5000);
+
+  // Clear poll when restarting
   $("#again").addEventListener("click", async ()=>{
+    if(pollId) clearInterval(pollId);
     score=0; current=0; streak=0; answered=false;
     allQuestions = await buildQuiz();
     renderQuestion(allQuestions[current]);
   });
 }
+
 
 // ---------- leaderboard helpers ----------
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m])); }
