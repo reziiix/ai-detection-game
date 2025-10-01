@@ -13,26 +13,21 @@ window.TEXT_QUESTIONS = [
       "Why did the algorithm cross the road? To optimize the chicken’s trajectory."
     ], answer:1, diff:"Easy"},
 
-  {type:"text", q:"Which short diary note is AI?",
-    options:[
-      "Got caught in the rain today. Soaked, but the puddles made the city sparkle.",
-      "Rainfall created hydration-based reflections on urban infrastructure."
-    ], answer:1, diff:"Easy"},
 
   // MEDIUM (harder wording, still diff:"Medium")
-  {type:"text", q:"Which reflection is AI?",
-    options:[
-      "Happiness is like sunlight through leaves — it arrives when you least try to hold it.",
-      "Happiness manifests as a derivative affective state contingent upon attenuated stress variables and positive expectancy alignment."
-    ], answer:1, diff:"Medium"},
+  // {type:"text", q:"Which reflection is AI?",
+  //   options:[
+  //     "Happiness is like sunlight through leaves — it arrives when you least try to hold it.",
+  //     "Happiness manifests as a derivative affective state contingent upon attenuated stress variables and positive expectancy alignment."
+  //   ], answer:1, diff:"Medium"},
 
-  {type:"odd", q:"Two are real headlines. One is AI-generated. Which one?",
-    options:[
-      "Town installs solar-powered benches that charge phones",
-      "City council approves blockchain-based empathy framework for civic disputes",
-      "Local bakery revives century-old bread recipe for modern market"
-    ],
-    answer:1, diff:"Medium"},
+  // {type:"odd", q:"Two are real headlines. One is AI-generated. Which one?",
+  //   options:[
+  //     "Town installs solar-powered benches that charge phones",
+  //     "City council approves blockchain-based empathy framework for civic disputes",
+  //     "Local bakery revives century-old bread recipe for modern market"
+  //   ],
+  //   answer:1, diff:"Medium"},
 
   // HARD
   {type:"text", q:"Which answer is AI? — What does freedom mean?",
